@@ -7,6 +7,7 @@ import (
     "math/rand"
     "time"
     "sync"
+    "fmt"
 )
 
 var mutex sync.Mutex
@@ -100,6 +101,7 @@ var mapa [][]Elemento
 var posX, posY int
 var ultimoElementoSobPersonagem = vazio
 var statusMsg string
+var ganhei = false
 
 var efeitoNeblina = false
 var revelado [][]bool
@@ -118,7 +120,7 @@ func main() {
     }
     desenhaTudo()
     go logicaInimigo()
-    for {
+    for !ganhei {
         switch ev := termbox.PollEvent(); ev.Type {
         case termbox.EventKey:
             if ev.Key == termbox.KeyEsc {
@@ -135,6 +137,9 @@ func main() {
             desenhaTudo()
         }
     }
+    termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+    fmt.Println("Você ganhou!")
+    time.Sleep(2 * time.Second)
 }
 
 func carregarMapa(nomeArquivo string) {
@@ -269,8 +274,9 @@ func interagir() {
                 mapa[y][x] = vazio
             } else if mapa[y][x].simbolo == porta.simbolo {
                 if statusMsg == "Você pegou a chave!" {
-                    statusMsg = "Você abriu a porta!"
+                    statusMsg = "Você abriu a porta! Parabéns!"
                     mapa[y][x] = vazio
+                    ganhei = true
                 } else {
                     statusMsg = "Você precisa da chave!"
                 }
@@ -280,8 +286,7 @@ func interagir() {
 }
 
 func logicaInimigo() {
-	while := true
-	for while {
+	for !ganhei {
 		rand.Seed(time.Now().UnixNano())
 		curX, curY := i.x, i.y
 		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
