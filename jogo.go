@@ -5,7 +5,12 @@ import (
     "github.com/nsf/termbox-go"
     "os"
     "fmt"
+    "math/rand"
+    "time"
+    "sync"
 )
+
+var mutex sync.Mutex
 
 // Define os elementos do jogo
 type Elemento struct {
@@ -19,13 +24,13 @@ type Elemento struct {
 var personagem = Elemento{
     simbolo: '☺',
     cor: termbox.ColorBlack,
-    corFundo: termbox.ColorDefault,
+    corFundo: termbox.ColorWhite,
     tangivel: true,
 }
 
 // Parede
 var parede = Elemento{
-    simbolo: '▤',
+    simbolo: '▣',
     cor: termbox.ColorBlack|termbox.AttrBold|termbox.AttrDim,
     corFundo: termbox.ColorDarkGray,
     tangivel: true,
@@ -63,6 +68,35 @@ var neblina = Elemento{
     tangivel: false,
 }
 
+var inimigo = Elemento{
+    simbolo: '☠',
+    cor: termbox.ColorRed,
+    corFundo: termbox.ColorDefault,
+    tangivel: true,
+}
+
+var chave = Elemento{
+    simbolo: '⚷',
+    cor: termbox.ColorYellow,
+    corFundo: termbox.ColorDefault,
+    tangivel: false,
+}
+
+var porta = Elemento{
+    simbolo: '⚑',
+    cor: termbox.ColorYellow,
+    corFundo: termbox.ColorBlack,
+    tangivel: false,
+}
+
+type Enemy struct {
+    x, y int
+    elem Elemento
+    alive bool
+}
+
+var i = Enemy{x: 0, y: 0, elem: inimigo, alive: true}
+
 var mapa [][]Elemento
 var posX, posY int
 var ultimoElementoSobPersonagem = vazio
@@ -84,7 +118,7 @@ func main() {
         revelarArea()
     }
     desenhaTudo()
-
+    go logicaInimigo()
     for {
         switch ev := termbox.PollEvent(); ev.Type {
         case termbox.EventKey:
@@ -130,6 +164,13 @@ func carregarMapa(nomeArquivo string) {
                 // Atualiza a posição inicial do personagem
                 posX, posY = x, y
                 elementoAtual = vazio
+            case inimigo.simbolo:
+                i.x, i.y = x, y
+                elementoAtual = inimigo
+            case chave.simbolo:
+                elementoAtual = chave
+            case porta.simbolo:
+                elementoAtual = porta
             }
             linhaElementos = append(linhaElementos, elementoAtual)
             linhaRevelada = append(linhaRevelada, false)
@@ -222,4 +263,22 @@ func mover(comando rune) {
 
 func interagir() {
     statusMsg = fmt.Sprintf("Interagindo em (%d, %d)", posX, posY)
+}
+
+func logicaInimigo() {
+	while := true
+	for while {
+		rand.Seed(time.Now().UnixNano())
+		curX, curY := i.x, i.y
+		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+		i.x += speedX          // Update i's X position
+		i.y += speedY          // Update i's Y position
+		mutex.Lock()
+		mapa[curY][curX] = vazio     // Clear previous i position on the map
+		mapa[i.y][i.x] = inimigo // Update i's new position on the map
+		desenhaTudo()
+		mutex.Unlock()
+		time.Sleep(500 * time.Millisecond) // Pause for a short duration
+	}
 }
