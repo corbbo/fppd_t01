@@ -4,7 +4,6 @@ import (
     "bufio"
     "github.com/nsf/termbox-go"
     "os"
-    "fmt"
     "math/rand"
     "time"
     "sync"
@@ -23,8 +22,8 @@ type Elemento struct {
 // Personagem controlado pelo jogador
 var personagem = Elemento{
     simbolo: '☺',
-    cor: termbox.ColorBlack,
-    corFundo: termbox.ColorWhite,
+    cor: termbox.ColorWhite,
+    corFundo: termbox.ColorDefault,
     tangivel: true,
 }
 
@@ -262,7 +261,22 @@ func mover(comando rune) {
 }
 
 func interagir() {
-    statusMsg = fmt.Sprintf("Interagindo em (%d, %d)", posX, posY)
+    //para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
+    for y := max(0, posY-2); y <= min(len(mapa)-1, posY+2); y++ {
+        for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
+            if mapa[y][x].simbolo == chave.simbolo {
+                statusMsg = "Você pegou a chave!"
+                mapa[y][x] = vazio
+            } else if mapa[y][x].simbolo == porta.simbolo {
+                if statusMsg == "Você pegou a chave!" {
+                    statusMsg = "Você abriu a porta!"
+                    mapa[y][x] = vazio
+                } else {
+                    statusMsg = "Você precisa da chave!"
+                }
+            }
+        }
+    }
 }
 
 func logicaInimigo() {
