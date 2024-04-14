@@ -336,8 +336,8 @@ func logicaInimigo() {
 func logicaPortal() {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(7)) * time.Second)
-	var y int = max(0, posY+rand.Intn(3)-1)
-	var x int = max(0, posX+rand.Intn(3)-1)
+	var y int = posY+rand.Intn(3)-1
+	var x int = posX+rand.Intn(3)-1
 	if y == posY && x == posX {
 		y++
 		x++
