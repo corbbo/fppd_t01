@@ -134,7 +134,7 @@ func main() {
 	}
 
 	desenhaTudo()
-	go logicaInimigo()
+	go logicaInimigoLui()
 	for !ganhei {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -314,5 +314,34 @@ func logicaInimigo() {
 		desenhaTudo()
 		mutex.Unlock()
 		time.Sleep(500 * time.Millisecond) // Pause for a short duration
+	}
+}
+
+func logicaInimigoLui() {
+	for !ganhei {
+		curX, curY := i.x, i.y
+		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+
+		var novaPosX, novaPosY int
+
+		for {
+			novaPosX, novaPosY = curX+speedX, curY+speedY
+			if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
+				mapa[novaPosY][novaPosX].tangivel == false {
+				i.x += speedX // Update i's X position
+				i.y += speedY // Update i's Y position
+				break
+			} else {
+				speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+				speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+			}
+		}
+		mutex.Lock()
+		mapa[curY][curX] = vazio // Clear previous i position on the map
+		mapa[i.y][i.x] = inimigo // Update i's new position on the map
+		desenhaTudo()
+		mutex.Unlock()
+		time.Sleep(200 * time.Millisecond) // Pause for a short duration
 	}
 }
