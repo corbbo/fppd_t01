@@ -135,6 +135,8 @@ func main() {
 
 	desenhaTudo()
 	go logicaInimigoLui()
+	go logicNPC()
+
 	for !ganhei {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -190,6 +192,9 @@ func carregarMapa(nomeArquivo string) {
 				elementoAtual = chave
 			case porta.simbolo:
 				elementoAtual = porta
+			case npc.simbolo:
+				n.x, n.y = x, y
+				elementoAtual = npc
 			}
 			linhaElementos = append(linhaElementos, elementoAtual)
 			linhaRevelada = append(linhaRevelada, false)
@@ -222,11 +227,11 @@ func desenhaTudo() {
 
 func desenhaBarraDeStatus() {
 	for i, c := range statusMsg {
-		termbox.SetCell(i, len(mapa)+1, c, termbox.ColorBlack, termbox.ColorDefault)
+		termbox.SetCell(i, len(mapa)+1, c, termbox.ColorCyan, termbox.ColorDefault)
 	}
 	msg := "Use WASD para mover e E para interagir. ESC para sair."
 	for i, c := range msg {
-		termbox.SetCell(i, len(mapa)+3, c, termbox.ColorBlack, termbox.ColorDefault)
+		termbox.SetCell(i, len(mapa)+3, c, termbox.ColorCyan, termbox.ColorDefault)
 	}
 }
 
@@ -343,5 +348,44 @@ func logicaInimigoLui() {
 		desenhaTudo()
 		mutex.Unlock()
 		time.Sleep(200 * time.Millisecond) // Pause for a short duration
+	}
+}
+
+func logicNPC() {
+	/*
+	   i want it to 'teleport' to a random position in the map
+	   so i won't draw the map, only after 30 steps
+
+	*/
+
+	for !ganhei {
+		initX, initY := n.x, n.y
+
+		curX, curY := n.x, n.y
+		for j := 0; j < 30; j++ {
+			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+
+			var novaPosX, novaPosY int
+
+			for {
+				novaPosX, novaPosY = curX+speedX, curY+speedY
+				if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
+					mapa[novaPosY][novaPosX].tangivel == false {
+					n.x += speedX // Update n's X position
+					n.y += speedY // Update n's Y position
+					break
+				} else {
+					speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+					speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+				}
+			}
+		}
+		mutex.Lock()
+		mapa[curY][curX] = vazio     // Clear previous i position on the map
+		mapa[initY][initX] = inimigo // Update i's new position on the map
+		desenhaTudo()
+		mutex.Unlock()
+		time.Sleep(300 * time.Millisecond) // Pause for a short duration
 	}
 }
