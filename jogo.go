@@ -15,86 +15,93 @@ var mutex sync.Mutex
 
 // Define os elementos do jogo
 type Elemento struct {
-	simbolo  rune
-	cor      termbox.Attribute
-	corFundo termbox.Attribute
-	tangivel bool
+	simbolo     rune
+	cor         termbox.Attribute
+	corFundo    termbox.Attribute
+	tangivel    bool
+	canBeKilled bool
 }
 
 // Personagem controlado pelo jogador
 var personagem = Elemento{
-	simbolo:  '☺',
-	cor:      termbox.ColorWhite,
-	corFundo: termbox.ColorDefault,
-	tangivel: true,
+	simbolo:     '☺',
+	cor:         termbox.ColorWhite,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    true,
+	canBeKilled: true,
 }
 
 // Parede
 var parede = Elemento{
-	simbolo:  '▣',
-	cor:      termbox.ColorBlack | termbox.AttrBold | termbox.AttrDim,
-	corFundo: termbox.ColorDarkGray,
-	tangivel: true,
+	simbolo:     '▣',
+	cor:         termbox.ColorBlack | termbox.AttrBold | termbox.AttrDim,
+	corFundo:    termbox.ColorDarkGray,
+	tangivel:    true,
+	canBeKilled: false,
 }
 
 // Barrreira
 var barreira = Elemento{
-	simbolo:  '#',
-	cor:      termbox.ColorRed,
-	corFundo: termbox.ColorDefault,
-	tangivel: true,
+	simbolo:     '#',
+	cor:         termbox.ColorRed,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    true,
+	canBeKilled: false,
 }
 
 // Vegetação
 var vegetacao = Elemento{
-	simbolo:  '♣',
-	cor:      termbox.ColorGreen,
-	corFundo: termbox.ColorDefault,
-	tangivel: false,
+	simbolo:     '♣',
+	cor:         termbox.ColorGreen,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    false,
+	canBeKilled: false,
 }
 
 // Elemento vazio
 var vazio = Elemento{
-	simbolo:  ' ',
-	cor:      termbox.ColorDefault,
-	corFundo: termbox.ColorDefault,
-	tangivel: false,
+	simbolo:     ' ',
+	cor:         termbox.ColorDefault,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    false,
+	canBeKilled: false,
 }
 
 // Elemento para representar áreas não reveladas (efeito de neblina)
 var neblina = Elemento{
-	simbolo:  '.',
-	cor:      termbox.ColorDefault,
-	corFundo: termbox.ColorYellow,
-	tangivel: false,
+	simbolo:     '.',
+	cor:         termbox.ColorDefault,
+	corFundo:    termbox.ColorYellow,
+	tangivel:    false,
+	canBeKilled: false,
 }
-
 var inimigo = Elemento{
-	simbolo:  '☠',
-	cor:      termbox.ColorRed,
-	corFundo: termbox.ColorDefault,
-	tangivel: true,
+	simbolo:     '☠',
+	cor:         termbox.ColorRed,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    true,
+	canBeKilled: false,
 }
-
 var chave = Elemento{
-	simbolo:  '⚷',
-	cor:      termbox.ColorYellow,
-	corFundo: termbox.ColorDefault,
-	tangivel: false,
+	simbolo:     '⚷',
+	cor:         termbox.ColorYellow,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    false,
+	canBeKilled: false,
 }
-
 var porta = Elemento{
-	simbolo:  '⚑',
-	cor:      termbox.ColorYellow,
-	corFundo: termbox.ColorBlack,
-	tangivel: false,
+	simbolo:     '⚑',
+	cor:         termbox.ColorYellow,
+	corFundo:    termbox.ColorBlack,
+	tangivel:    false,
+	canBeKilled: false,
 }
-
 var npc = Elemento{
-	simbolo:  'ツ',
-	cor:      termbox.ColorBlue,
-	corFundo: termbox.ColorDefault,
-	tangivel: true,
+	simbolo:     'ﭶ',
+	cor:         termbox.ColorBlue,
+	corFundo:    termbox.ColorDefault,
+	tangivel:    true,
+	canBeKilled: true,
 }
 
 type Enemy struct {
@@ -103,19 +110,28 @@ type Enemy struct {
 	alive bool
 }
 type NonPlayerChar struct {
-	x, y       int
-	elem       Elemento
-	interacted bool
+	x, y        int
+	elem        Elemento
+	interacted  bool
+	canBeKilled bool
 }
 
 var i = Enemy{x: 0, y: 0, elem: inimigo, alive: true}
-var n = NonPlayerChar{x: 0, y: 0, elem: npc}
+var n = NonPlayerChar{x: 0, y: 0, elem: npc, interacted: false, canBeKilled: true}
+var winnable = false
+var ded = false
+var borked = false
 
 var mapa [][]Elemento
 var posX, posY int
 var ultimoElementoSobPersonagem = vazio
 var statusMsg string
 var ganhei = false
+var doubleSPEED = false
+var passos = 0
+
+var doneNPC = make(chan bool)
+var doneInimigo = make(chan bool)
 
 var efeitoNeblina = false
 var revelado [][]bool
@@ -136,8 +152,10 @@ func main() {
 	desenhaTudo()
 	go logicaInimigoLui()
 	go logicNPC()
+	go checkEnemy2cell()
+	go checkEnemy1cell()
 
-	for !ganhei {
+	for !ganhei || !ded {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			if ev.Key == termbox.KeyEsc {
@@ -155,7 +173,11 @@ func main() {
 		}
 	}
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	fmt.Println("Você ganhou!")
+	if ded == true {
+		fmt.Println("Você perdeu!")
+	} else {
+		fmt.Println("Você ganhou!")
+	}
 	time.Sleep(2 * time.Second)
 }
 
@@ -187,14 +209,14 @@ func carregarMapa(nomeArquivo string) {
 				elementoAtual = vazio
 			case inimigo.simbolo:
 				i.x, i.y = x, y
-				elementoAtual = inimigo
+				elementoAtual = vazio
 			case chave.simbolo:
 				elementoAtual = chave
 			case porta.simbolo:
 				elementoAtual = porta
 			case npc.simbolo:
 				n.x, n.y = x, y
-				elementoAtual = npc
+				elementoAtual = vazio
 			}
 			linhaElementos = append(linhaElementos, elementoAtual)
 			linhaRevelada = append(linhaRevelada, false)
@@ -267,13 +289,33 @@ func mover(comando rune) {
 	dx, dy := 0, 0
 	switch comando {
 	case 'w':
-		dy = -1
+		if doubleSPEED {
+			dy = -2
+			passos = passos + 2
+		} else {
+			dy = -1
+		}
 	case 'a':
-		dx = -1
+		if doubleSPEED {
+			dx = -2
+			passos = passos + 2
+		} else {
+			dx = -1
+		}
 	case 's':
-		dy = 1
+		if doubleSPEED {
+			dy = 2
+			passos = passos + 2
+		} else {
+			dy = 1
+		}
 	case 'd':
-		dx = 1
+		if doubleSPEED {
+			dx = 2
+			passos = passos + 2
+		} else {
+			dx = 1
+		}
 	}
 	novaPosX, novaPosY := posX+dx, posY+dy
 	if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
@@ -291,14 +333,27 @@ func interagir() {
 		for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
 			if mapa[y][x].simbolo == chave.simbolo {
 				statusMsg = "Você pegou a chave!"
+				winnable = true
 				mapa[y][x] = vazio
 			} else if mapa[y][x].simbolo == porta.simbolo {
-				if statusMsg == "Você pegou a chave!" {
+				if winnable { //only lets player win if he has the key
 					statusMsg = "Você abriu a porta! Parabéns!"
 					mapa[y][x] = vazio
 					ganhei = true
 				} else {
 					statusMsg = "Você precisa da chave!"
+				}
+			} else if mapa[y][x].simbolo == npc.simbolo {
+				if !n.interacted {
+					statusMsg = "Você ganhou o buff de velocidade! (30 passos rápidos)"
+					doubleSPEED = true
+					go passosDados()
+					n.elem = vazio
+					mapa[y][x] = vazio
+					doneNPC <- true
+					n.interacted = true
+				} else {
+					statusMsg = "Você já interagiu com o NPC!"
 				}
 			}
 		}
@@ -306,7 +361,7 @@ func interagir() {
 }
 
 func logicaInimigo() {
-	for !ganhei {
+	for !ganhei || !ded {
 		rand.Seed(time.Now().UnixNano())
 		curX, curY := i.x, i.y
 		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
@@ -323,49 +378,58 @@ func logicaInimigo() {
 }
 
 func logicaInimigoLui() {
-	for !ganhei {
-		curX, curY := i.x, i.y
-		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+	for !ganhei || !ded {
+		select {
+		case <-doneInimigo:
+			return
+		default:
+			curX, curY := i.x, i.y
+			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
 
-		var novaPosX, novaPosY int
+			var novaPosX, novaPosY int
 
-		for {
-			novaPosX, novaPosY = curX+speedX, curY+speedY
-			if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
-				mapa[novaPosY][novaPosX].tangivel == false {
-				i.x += speedX // Update i's X position
-				i.y += speedY // Update i's Y position
-				break
-			} else {
-				speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-				speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+			for {
+				novaPosX, novaPosY = curX+speedX, curY+speedY
+				if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
+					(mapa[novaPosY][novaPosX].tangivel && !mapa[novaPosY][novaPosX].canBeKilled) == false {
+					i.x += speedX // Update i's X position
+					i.y += speedY // Update i's Y position
+					break
+				} else {
+					speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+					speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+				}
 			}
+			mutex.Lock()
+			mapa[curY][curX] = vazio // Clear previous i position on the map
+			mapa[i.y][i.x] = inimigo // Update i's new position on the map
+			desenhaTudo()
+			mutex.Unlock()
+			if borked {
+				time.Sleep(1000 * time.Millisecond) // Pause for a short duration
+				statusMsg = "O Inimigo levou stun!"
+			} else {
+				time.Sleep(50 * time.Millisecond) // Pause for a short duration
+			}
+
 		}
-		mutex.Lock()
-		mapa[curY][curX] = vazio // Clear previous i position on the map
-		mapa[i.y][i.x] = inimigo // Update i's new position on the map
-		desenhaTudo()
-		mutex.Unlock()
-		time.Sleep(200 * time.Millisecond) // Pause for a short duration
 	}
 }
 
 func logicNPC() {
-	/*
-	   i want it to 'teleport' to a random position in the map
-	   so i won't draw the map, only after 30 steps
 
-	*/
+	for !ganhei || !ded {
+		select {
+		case <-doneNPC:
+			return
+		default:
 
-	for !ganhei {
-		initX, initY := n.x, n.y
+			curX, curY := n.x, n.y
+			initX, initY := n.x, n.y
 
-		curX, curY := n.x, n.y
-		for j := 0; j < 30; j++ {
 			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
 			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-
 			var novaPosX, novaPosY int
 
 			for {
@@ -380,12 +444,99 @@ func logicNPC() {
 					speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
 				}
 			}
+			mutex.Lock()
+			mapa[initY][initX] = vazio // Clear previous i position on the map
+			mapa[n.y][n.x] = npc       // Update i's new position on the map
+			desenhaTudo()
+			mutex.Unlock()
+			time.Sleep(3000 * time.Millisecond) // Pause for a short duration
 		}
-		mutex.Lock()
-		mapa[curY][curX] = vazio     // Clear previous i position on the map
-		mapa[initY][initX] = inimigo // Update i's new position on the map
-		desenhaTudo()
-		mutex.Unlock()
-		time.Sleep(300 * time.Millisecond) // Pause for a short duration
+	}
+}
+
+func passosDados() {
+	for passos < 40 {
+	}
+	doubleSPEED = false
+	passos = 0
+	go logicNPC()
+	return
+}
+func checkEnemy2cell() /* pode matar chave e npc*/ {
+	//para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
+
+	for !ganhei || !ded {
+
+		for y := max(0, i.y-2); y <= min(len(mapa)-1, i.y+2); y++ {
+			for x := max(0, i.x-2); x <= min(len(mapa[y])-1, i.x+2); x++ {
+				if mapa[y][x].simbolo == chave.simbolo {
+					statusMsg = "O inimigo matou a chave, corra para a porta!"
+					winnable = true
+
+					mutex.Lock()
+					mapa[y][x] = vazio
+					desenhaTudo()
+					mutex.Unlock()
+					borked = true
+
+				} else if mapa[y][x].simbolo == npc.simbolo {
+					if n.canBeKilled {
+						statusMsg = "O inimigo matou o NPC!"
+						mutex.Lock()
+
+						n.elem = vazio
+						mapa[y][x] = vazio
+						desenhaTudo()
+						mutex.Unlock()
+
+						doneNPC <- true
+						borked = true
+
+					} else {
+						statusMsg = "O inimigo não pode matar o NPC!"
+					}
+				}
+				if borked {
+					time.Sleep(500 * time.Millisecond) // Pause for a short duration
+					borked = false
+				}
+			}
+		}
+
+	}
+}
+func checkEnemy1cell() /* pode matar parede e jogador*/ {
+	for !ganhei || !ded {
+		//para cada celula na matriz num raio de 1 celulas, interage com o elemento mais próximo
+		for y := max(0, i.y-1); y <= min(len(mapa)-1, i.y+1); y++ {
+			for x := max(0, i.x-1); x <= min(len(mapa[y])-1, i.x+1); x++ {
+				if mapa[y][x].simbolo == parede.simbolo {
+					statusMsg = "O inimigo quebrou uma parede!"
+					mutex.Lock()
+					mapa[y][x] = vazio
+					desenhaTudo()
+					mutex.Unlock()
+					borked = true
+
+				} else if mapa[y][x].simbolo == personagem.simbolo {
+					if personagem.canBeKilled {
+						statusMsg = "O inimigo te matou!"
+						mutex.Lock()
+						n.elem = vazio
+						mapa[y][x] = vazio
+						desenhaTudo()
+						mutex.Unlock()
+						ded = true
+					} else {
+						statusMsg = "O inimigo não pode te matar!"
+					}
+				}
+				if borked {
+					time.Sleep(1000 * time.Millisecond) // Pause for a short duration
+					borked = false                      //só pode quebrar a parede uma vez a cada segundo
+				}
+			}
+		}
+
 	}
 }

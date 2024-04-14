@@ -14,3 +14,7 @@ clean:
 
 distclean: clean
 	rm -f go.mod go.sum
+
+run:
+	make 
+	jogo.exe
