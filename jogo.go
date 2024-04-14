@@ -94,7 +94,7 @@ var portal = Elemento{
 	simbolo:  'ೱ',
 	cor:      termbox.ColorCyan,
 	corFundo: termbox.ColorBlack,
-	tangivel: true,
+	tangivel: false,
 }
 
 type Enemy struct {
@@ -283,6 +283,7 @@ func interagir() {
 		for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
 			if mapa[y][x].simbolo == portal.simbolo {
 				mapa[posY][posX].simbolo = vazio.simbolo
+				desenhaTudo()
 				teleX = (rand.Intn(90) - rand.Intn(90))
 				teleY = (rand.Intn(90) - rand.Intn(90))
 				if teleX >= len(mapa[y])-1 {
@@ -341,7 +342,13 @@ func logicaPortal() {
 		y++
 		x++
 	}
+	mutex.Lock()
 	mapa[y][x].simbolo = portal.simbolo
+	desenhaTudo()
+	mutex.Unlock()
 	time.Sleep(5 * time.Second)
+	mutex.Lock()
 	mapa[y][x].simbolo = vazio.simbolo
+	desenhaTudo()
+	mutex.Unlock()
 }
