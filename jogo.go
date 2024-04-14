@@ -155,7 +155,7 @@ func main() {
 	go checkEnemy2cell()
 	go checkEnemy1cell()
 
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			if ev.Key == termbox.KeyEsc {
@@ -345,7 +345,7 @@ func interagir() {
 				}
 			} else if mapa[y][x].simbolo == npc.simbolo {
 				if !n.interacted {
-					statusMsg = "Você ganhou o buff de velocidade! (30 passos rápidos)"
+					statusMsg = "Você ganhou o buff de velocidade! (40 passos rápidos)"
 					doubleSPEED = true
 					go passosDados()
 					n.elem = vazio
@@ -361,7 +361,7 @@ func interagir() {
 }
 
 func logicaInimigo() {
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 		rand.Seed(time.Now().UnixNano())
 		curX, curY := i.x, i.y
 		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
@@ -378,7 +378,7 @@ func logicaInimigo() {
 }
 
 func logicaInimigoLui() {
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 		select {
 		case <-doneInimigo:
 			return
@@ -407,10 +407,10 @@ func logicaInimigoLui() {
 			desenhaTudo()
 			mutex.Unlock()
 			if borked {
-				time.Sleep(1000 * time.Millisecond) // Pause for a short duration
+				time.Sleep(800 * time.Millisecond) // Pause for a short duration
 				statusMsg = "O Inimigo levou stun!"
 			} else {
-				time.Sleep(50 * time.Millisecond) // Pause for a short duration
+				time.Sleep(100 * time.Millisecond) // Pause for a short duration
 			}
 
 		}
@@ -419,7 +419,7 @@ func logicaInimigoLui() {
 
 func logicNPC() {
 
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 		select {
 		case <-doneNPC:
 			return
@@ -465,7 +465,7 @@ func passosDados() {
 func checkEnemy2cell() /* pode matar chave e npc*/ {
 	//para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
 
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 
 		for y := max(0, i.y-2); y <= min(len(mapa)-1, i.y+2); y++ {
 			for x := max(0, i.x-2); x <= min(len(mapa[y])-1, i.x+2); x++ {
@@ -476,8 +476,8 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 					mutex.Lock()
 					mapa[y][x] = vazio
 					desenhaTudo()
-					mutex.Unlock()
 					borked = true
+					mutex.Unlock()
 
 				} else if mapa[y][x].simbolo == npc.simbolo {
 					if n.canBeKilled {
@@ -487,10 +487,10 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 						n.elem = vazio
 						mapa[y][x] = vazio
 						desenhaTudo()
+						borked = true
 						mutex.Unlock()
 
 						doneNPC <- true
-						borked = true
 
 					} else {
 						statusMsg = "O inimigo não pode matar o NPC!"
@@ -506,7 +506,7 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 	}
 }
 func checkEnemy1cell() /* pode matar parede e jogador*/ {
-	for !ganhei || !ded {
+	for !(ganhei || ded) {
 		//para cada celula na matriz num raio de 1 celulas, interage com o elemento mais próximo
 		for y := max(0, i.y-1); y <= min(len(mapa)-1, i.y+1); y++ {
 			for x := max(0, i.x-1); x <= min(len(mapa[y])-1, i.x+1); x++ {
@@ -515,8 +515,8 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 					mutex.Lock()
 					mapa[y][x] = vazio
 					desenhaTudo()
-					mutex.Unlock()
 					borked = true
+					mutex.Unlock()
 
 				} else if mapa[y][x].simbolo == personagem.simbolo {
 					if personagem.canBeKilled {
@@ -532,8 +532,10 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 					}
 				}
 				if borked {
+					mutex.Lock()
 					time.Sleep(1000 * time.Millisecond) // Pause for a short duration
 					borked = false                      //só pode quebrar a parede uma vez a cada segundo
+					mutex.Unlock()
 				}
 			}
 		}
