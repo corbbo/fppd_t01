@@ -90,10 +90,10 @@ var porta = Elemento{
 	tangivel: false,
 }
 
-var npc = Elemento{
-	simbolo:  'ツ',
-	cor:      termbox.ColorBlue,
-	corFundo: termbox.ColorDefault,
+var portal = Elemento{
+	simbolo:  'ೱ',
+	cor:      termbox.ColorCyan,
+	corFundo: termbox.ColorBlack,
 	tangivel: true,
 }
 
@@ -102,14 +102,8 @@ type Enemy struct {
 	elem  Elemento
 	alive bool
 }
-type NonPlayerChar struct {
-	x, y       int
-	elem       Elemento
-	interacted bool
-}
 
 var i = Enemy{x: 0, y: 0, elem: inimigo, alive: true}
-var n = NonPlayerChar{x: 0, y: 0, elem: npc}
 
 var mapa [][]Elemento
 var posX, posY int
@@ -132,11 +126,9 @@ func main() {
 	if efeitoNeblina {
 		revelarArea()
 	}
-
 	desenhaTudo()
-	go logicaInimigoLui()
-	go logicNPC()
-
+	go logicaInimigo()
+	go logicaPortal()
 	for !ganhei {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -192,9 +184,6 @@ func carregarMapa(nomeArquivo string) {
 				elementoAtual = chave
 			case porta.simbolo:
 				elementoAtual = porta
-			case npc.simbolo:
-				n.x, n.y = x, y
-				elementoAtual = npc
 			}
 			linhaElementos = append(linhaElementos, elementoAtual)
 			linhaRevelada = append(linhaRevelada, false)
@@ -227,11 +216,11 @@ func desenhaTudo() {
 
 func desenhaBarraDeStatus() {
 	for i, c := range statusMsg {
-		termbox.SetCell(i, len(mapa)+1, c, termbox.ColorCyan, termbox.ColorDefault)
+		termbox.SetCell(i, len(mapa)+1, c, termbox.ColorBlack, termbox.ColorDefault)
 	}
 	msg := "Use WASD para mover e E para interagir. ESC para sair."
 	for i, c := range msg {
-		termbox.SetCell(i, len(mapa)+3, c, termbox.ColorCyan, termbox.ColorDefault)
+		termbox.SetCell(i, len(mapa)+3, c, termbox.ColorBlack, termbox.ColorDefault)
 	}
 }
 
@@ -287,9 +276,30 @@ func mover(comando rune) {
 
 func interagir() {
 	//para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
+	var teleX int
+	var teleY int
+	rand.Seed(time.Now().UnixNano())
 	for y := max(0, posY-2); y <= min(len(mapa)-1, posY+2); y++ {
 		for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
-			if mapa[y][x].simbolo == chave.simbolo {
+			if mapa[y][x].simbolo == portal.simbolo {
+				mapa[posY][posX].simbolo = vazio.simbolo
+				teleX = (rand.Intn(90) - rand.Intn(90))
+				teleY = (rand.Intn(90) - rand.Intn(90))
+				if teleX >= len(mapa[y])-1 {
+					teleX = len(mapa[y]) - 2
+				}
+				if teleX <= 0 {
+					teleX = 2
+				}
+				if teleY <= 0 {
+					teleY = 2
+				}
+				if teleY >= len(mapa)-1 {
+					teleY = len(mapa) - 2
+				}
+				posX = teleX
+				posY = teleY
+			} else if mapa[y][x].simbolo == chave.simbolo {
 				statusMsg = "Você pegou a chave!"
 				mapa[y][x] = vazio
 			} else if mapa[y][x].simbolo == porta.simbolo {
@@ -322,70 +332,16 @@ func logicaInimigo() {
 	}
 }
 
-func logicaInimigoLui() {
-	for !ganhei {
-		curX, curY := i.x, i.y
-		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-
-		var novaPosX, novaPosY int
-
-		for {
-			novaPosX, novaPosY = curX+speedX, curY+speedY
-			if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
-				mapa[novaPosY][novaPosX].tangivel == false {
-				i.x += speedX // Update i's X position
-				i.y += speedY // Update i's Y position
-				break
-			} else {
-				speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-				speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-			}
-		}
-		mutex.Lock()
-		mapa[curY][curX] = vazio // Clear previous i position on the map
-		mapa[i.y][i.x] = inimigo // Update i's new position on the map
-		desenhaTudo()
-		mutex.Unlock()
-		time.Sleep(200 * time.Millisecond) // Pause for a short duration
+func logicaPortal() {
+	rand.Seed(time.Now().UnixNano())
+	time.Sleep(time.Duration(rand.Intn(7)-1) * time.Second)
+	var y int = max(0, posY+rand.Intn(3)-1)
+	var x int = max(0, posX+rand.Intn(3)-1)
+	if y == posY && x == posX {
+		y++
+		x++
 	}
-}
-
-func logicNPC() {
-	/*
-	   i want it to 'teleport' to a random position in the map
-	   so i won't draw the map, only after 30 steps
-
-	*/
-
-	for !ganhei {
-		initX, initY := n.x, n.y
-
-		curX, curY := n.x, n.y
-		for j := 0; j < 30; j++ {
-			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-
-			var novaPosX, novaPosY int
-
-			for {
-				novaPosX, novaPosY = curX+speedX, curY+speedY
-				if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
-					mapa[novaPosY][novaPosX].tangivel == false {
-					n.x += speedX // Update n's X position
-					n.y += speedY // Update n's Y position
-					break
-				} else {
-					speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-					speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-				}
-			}
-		}
-		mutex.Lock()
-		mapa[curY][curX] = vazio     // Clear previous i position on the map
-		mapa[initY][initX] = inimigo // Update i's new position on the map
-		desenhaTudo()
-		mutex.Unlock()
-		time.Sleep(300 * time.Millisecond) // Pause for a short duration
-	}
+	mapa[y][x].simbolo = portal.simbolo
+	time.Sleep(5 * time.Second)
+	mapa[y][x].simbolo = vazio.simbolo
 }
