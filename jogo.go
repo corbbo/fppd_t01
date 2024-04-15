@@ -124,8 +124,15 @@ type NonPlayerChar struct {
 	canBeKilled bool
 }
 
+type _portal struct {
+	x, y       int
+	elem       Elemento
+	interacted bool
+}
+
 var i = Enemy{x: 0, y: 0, elem: inimigo, alive: true}
 var n = NonPlayerChar{x: 0, y: 0, elem: npc, interacted: false, canBeKilled: true}
+var p = _portal{x: 0, y: 0, elem: portal, interacted: false}
 var winnable = false
 var ded = false
 var borked = false
