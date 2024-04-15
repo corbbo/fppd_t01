@@ -93,7 +93,7 @@ var porta = Elemento{
 	simbolo:     '⚑',
 	cor:         termbox.ColorYellow,
 	corFundo:    termbox.ColorBlack,
-	tangivel:    false,
+	tangivel:    true,
 	canBeKilled: false,
 }
 var npc = Elemento{
@@ -102,6 +102,14 @@ var npc = Elemento{
 	corFundo:    termbox.ColorDefault,
 	tangivel:    true,
 	canBeKilled: true,
+}
+
+var portal = Elemento{
+	simbolo:     'ೱ',
+	cor:         termbox.ColorCyan,
+	corFundo:    termbox.ColorBlack,
+	tangivel:    false,
+	canBeKilled: false,
 }
 
 type Enemy struct {
@@ -154,6 +162,7 @@ func main() {
 	go logicNPC()
 	go checkEnemy2cell()
 	go checkEnemy1cell()
+	go logicaPortal()
 
 	for !(ganhei || ded) {
 		switch ev := termbox.PollEvent(); ev.Type {
@@ -328,6 +337,8 @@ func mover(comando rune) {
 }
 
 func interagir() {
+	var teleX int
+	var teleY int
 	//para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
 	for y := max(0, posY-2); y <= min(len(mapa)-1, posY+2); y++ {
 		for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
@@ -355,25 +366,30 @@ func interagir() {
 				} else {
 					statusMsg = "Você já interagiu com o NPC!"
 				}
+			} else if mapa[y][x].simbolo == portal.simbolo {
+				mapa[posY][posX].simbolo = vazio.simbolo
+				mapa[y][x].simbolo = vazio.simbolo
+
+				desenhaTudo()
+				teleX = (rand.Intn(90) - rand.Intn(90))
+				teleY = (rand.Intn(90) - rand.Intn(90))
+				if teleX >= len(mapa[y])-1 {
+					teleX = len(mapa[y]) - 2
+				}
+				if teleX <= 0 {
+					teleX = 2
+				}
+				if teleY <= 0 {
+					teleY = 2
+				}
+				if teleY >= len(mapa)-1 {
+					teleY = len(mapa) - 2
+				}
+				posX = teleX //isso possivelmente tá dando o erro do mapa quebrar quando o personagem entra no portal
+				posY = teleY
+				desenhaTudo()
 			}
 		}
-	}
-}
-
-func logicaInimigo() {
-	for !(ganhei || ded) {
-		rand.Seed(time.Now().UnixNano())
-		curX, curY := i.x, i.y
-		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-		i.x += speedX              // Update i's X position
-		i.y += speedY              // Update i's Y position
-		mutex.Lock()
-		mapa[curY][curX] = vazio // Clear previous i position on the map
-		mapa[i.y][i.x] = inimigo // Update i's new position on the map
-		desenhaTudo()
-		mutex.Unlock()
-		time.Sleep(500 * time.Millisecond) // Pause for a short duration
 	}
 }
 
@@ -540,5 +556,26 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 			}
 		}
 
+	}
+}
+func logicaPortal() {
+	for !(ganhei || ded) {
+		time.Sleep(time.Duration(rand.Intn(7)) * time.Second)
+		var yPortal int = posY + rand.Intn(3) - 1
+		var xPortal int = posX + rand.Intn(3) - 1
+		if yPortal == posY && xPortal == posX {
+			yPortal++
+			xPortal++
+		}
+		mutex.Lock()
+		mapa[yPortal][xPortal].simbolo = portal.simbolo
+		desenhaTudo()
+		mutex.Unlock()
+		time.Sleep(5 * time.Second)
+		mutex.Lock()
+		mapa[yPortal][xPortal].simbolo = vazio.simbolo
+		desenhaTudo()
+		mutex.Unlock()
+		time.Sleep(5 * time.Second)
 	}
 }
