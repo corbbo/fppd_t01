@@ -130,6 +130,9 @@ type _portal struct {
 	interacted bool
 }
 
+var interable = [4]rune{chave.simbolo, porta.simbolo, npc.simbolo, portal.simbolo}
+var functions = [4]func(x int, y int){interact_chave, interact_porta, interact_npc, interact_portal}
+
 var i = Enemy{x: 0, y: 0, elem: inimigo, alive: true}
 var n = NonPlayerChar{x: 0, y: 0, elem: npc, interacted: false, canBeKilled: true}
 var p = _portal{x: 0, y: 0, elem: portal, interacted: false}
@@ -344,67 +347,13 @@ func mover(comando rune) {
 }
 
 func interagir() {
-	var teleX int
-	var teleY int
 	//para cada celula na matriz num raio de 2 celulas, interage com o elemento mais próximo
 	for y := max(0, posY-2); y <= min(len(mapa)-1, posY+2); y++ {
 		for x := max(0, posX-2); x <= min(len(mapa[y])-1, posX+2); x++ {
-			if mapa[y][x].simbolo == chave.simbolo {
-				statusMsg = "Você pegou a chave!"
-				winnable = true
-				mutex.Lock()
-				mapa[y][x] = vazio
-				mutex.Unlock()
-			} else if mapa[y][x].simbolo == porta.simbolo {
-				if winnable { //only lets player win if he has the key
-					statusMsg = "Você abriu a porta! Parabéns!"
-					mutex.Lock()
-					mapa[y][x] = vazio
-					mutex.Unlock()
-					ganhei = true
-				} else {
-					statusMsg = "Você precisa da chave!"
+			for count := 0; count < len(interable); count++ {
+				if mapa[y][x].simbolo == interable[count] {
+					functions[count](x, y)
 				}
-			} else if mapa[y][x].simbolo == npc.simbolo {
-				if !n.interacted {
-					statusMsg = "Você ganhou o buff de velocidade! (40 passos rápidos)"
-					doubleSPEED = true
-					go passosDados()
-					n.elem = vazio
-					mutex.Lock()
-					mapa[y][x] = vazio
-					mutex.Unlock()
-					doneNPC <- true
-					n.interacted = true
-				} else {
-					statusMsg = "Você já interagiu com o NPC!"
-				}
-			} else if mapa[y][x].simbolo == portal.simbolo {
-				mutex.Lock()
-				mapa[posY][posX] = vazio
-				mapa[y][x] = vazio
-				mutex.Unlock()
-
-				desenhaTudo()
-				teleX = (rand.Intn(90) - rand.Intn(90))
-				teleY = (rand.Intn(90) - rand.Intn(90))
-				if teleX >= len(mapa[y])-1 {
-					teleX = len(mapa[y]) - 2
-				}
-				if teleX <= 0 {
-					teleX = 2
-				}
-				if teleY <= 0 {
-					teleY = 2
-				}
-				if teleY >= len(mapa)-1 {
-					teleY = len(mapa) - 2
-				}
-				mutex.Lock()
-				posX = teleX //isso possivelmente tá dando o erro do mapa quebrar quando o personagem entra no portal
-				posY = teleY
-				mutex.Unlock()
-				desenhaTudo()
 			}
 		}
 	}
@@ -416,40 +365,41 @@ func logicaInimigoLui() {
 		// case <-doneInimigo:
 		// 	return
 		// default:
-			curX, curY := i.x, i.y
-			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
+		curX, curY := i.x, i.y
+		speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+		speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
 
-			var novaPosX, novaPosY int
+		var novaPosX, novaPosY int
 
-			for {
-				novaPosX, novaPosY = curX+speedX, curY+speedY
-				if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
-					(mapa[novaPosY][novaPosX].tangivel && !mapa[novaPosY][novaPosX].canBeKilled) == false {
-					i.x += speedX // Update i's X position
-					i.y += speedY // Update i's Y position
-					break
-				} else {
-					speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
-					speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
-				}
-			}
-			mutex.Lock()
-			mapa[curY][curX] = vazio // Clear previous i position on the map
-			mapa[i.y][i.x] = inimigo // Update i's new position on the map
-			desenhaTudo()
-			mutex.Unlock()
-			if borked {
-				mutex.Lock()
-				statusMsg = "O Inimigo levou stun!"
-				mutex.Unlock()
-				time.Sleep(800 * time.Millisecond) // Pause for a short duration
+		for {
+			novaPosX, novaPosY = curX+speedX, curY+speedY
+			if novaPosY >= 0 && novaPosY < len(mapa) && novaPosX >= 0 && novaPosX < len(mapa[novaPosY]) &&
+				(mapa[novaPosY][novaPosX].tangivel && !mapa[novaPosY][novaPosX].canBeKilled) == false {
+				i.x += speedX // Update i's X position
+				i.y += speedY // Update i's Y position
+				break
 			} else {
-				time.Sleep(100 * time.Millisecond) // Pause for a short duration
+				speedX = rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
+				speedY = rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
 			}
-
 		}
+		mutex.Lock()
+		mapa[curY][curX] = vazio // Clear previous i position on the map
+		mapa[i.y][i.x] = inimigo // Update i's new position on the map
+		desenhaTudo()
+		mutex.Unlock()
+		if borked {
+			mutex.Lock()
+			statusMsg = "O Inimigo levou stun!"
+			mutex.Unlock()
+			time.Sleep(800 * time.Millisecond) // Pause for a short duration
+		} else {
+			time.Sleep(100 * time.Millisecond) // Pause for a short duration
+		}
+
 	}
+}
+
 //}
 
 func logicNPC() {
@@ -506,7 +456,7 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 			for x := max(0, i.x-2); x <= min(len(mapa[y])-1, i.x+2); x++ {
 				if mapa[y][x].simbolo == chave.simbolo {
 					winnable = true
-					
+
 					mutex.Lock()
 					statusMsg = "O inimigo matou a chave, corra para a porta!"
 					mapa[y][x] = vazio
@@ -603,4 +553,67 @@ func logicaPortal() {
 		mutex.Unlock()
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func interact_chave(x int, y int) {
+	statusMsg = "Você pegou a chave!"
+	winnable = true
+	mutex.Lock()
+	mapa[y][x] = vazio
+	mutex.Unlock()
+}
+func interact_porta(x int, y int) {
+	if winnable { //only lets player win if he has the key
+		statusMsg = "Você abriu a porta! Parabéns!"
+		mutex.Lock()
+		mapa[y][x] = vazio
+		mutex.Unlock()
+		ganhei = true
+	} else {
+		statusMsg = "Você precisa da chave!"
+	}
+}
+func interact_npc(x int, y int) {
+	if !n.interacted {
+		statusMsg = "Você ganhou o buff de velocidade! (40 passos rápidos)"
+		doubleSPEED = true
+		go passosDados()
+		n.elem = vazio
+		mutex.Lock()
+		mapa[y][x] = vazio
+		mutex.Unlock()
+		doneNPC <- true
+		n.interacted = true
+	} else {
+		statusMsg = "Você já interagiu com o NPC!"
+	}
+}
+func interact_portal(x int, y int) {
+	var teleX int
+	var teleY int
+	mutex.Lock()
+	mapa[posY][posX] = vazio
+	mapa[y][x] = vazio
+	mutex.Unlock()
+
+	desenhaTudo()
+	teleX = (rand.Intn(90) - rand.Intn(90))
+	teleY = (rand.Intn(90) - rand.Intn(90))
+	if teleX >= len(mapa[y])-1 {
+		teleX = len(mapa[y]) - 2
+	}
+	if teleX <= 0 {
+		teleX = 2
+	}
+	if teleY <= 0 {
+		teleY = 2
+	}
+	if teleY >= len(mapa)-1 {
+		teleY = len(mapa) - 2
+	}
+	mutex.Lock()
+	posX = teleX //isso possivelmente tá dando o erro do mapa quebrar quando o personagem entra no portal
+	posY = teleY
+	mutex.Unlock()
+	desenhaTudo()
 }
