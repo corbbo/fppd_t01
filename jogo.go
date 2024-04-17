@@ -352,11 +352,15 @@ func interagir() {
 			if mapa[y][x].simbolo == chave.simbolo {
 				statusMsg = "Você pegou a chave!"
 				winnable = true
+				mutex.Lock()
 				mapa[y][x] = vazio
+				mutex.Unlock()
 			} else if mapa[y][x].simbolo == porta.simbolo {
 				if winnable { //only lets player win if he has the key
 					statusMsg = "Você abriu a porta! Parabéns!"
+					mutex.Lock()
 					mapa[y][x] = vazio
+					mutex.Unlock()
 					ganhei = true
 				} else {
 					statusMsg = "Você precisa da chave!"
@@ -367,15 +371,19 @@ func interagir() {
 					doubleSPEED = true
 					go passosDados()
 					n.elem = vazio
+					mutex.Lock()
 					mapa[y][x] = vazio
+					mutex.Unlock()
 					doneNPC <- true
 					n.interacted = true
 				} else {
 					statusMsg = "Você já interagiu com o NPC!"
 				}
 			} else if mapa[y][x].simbolo == portal.simbolo {
-				mapa[posY][posX].simbolo = vazio.simbolo
-				mapa[y][x].simbolo = vazio.simbolo
+				mutex.Lock()
+				mapa[posY][posX] = vazio
+				mapa[y][x] = vazio
+				mutex.Unlock()
 
 				desenhaTudo()
 				teleX = (rand.Intn(90) - rand.Intn(90))
@@ -392,8 +400,10 @@ func interagir() {
 				if teleY >= len(mapa)-1 {
 					teleY = len(mapa) - 2
 				}
+				mutex.Lock()
 				posX = teleX //isso possivelmente tá dando o erro do mapa quebrar quando o personagem entra no portal
 				posY = teleY
+				mutex.Unlock()
 				desenhaTudo()
 			}
 		}
@@ -402,10 +412,10 @@ func interagir() {
 
 func logicaInimigoLui() {
 	for !(ganhei || ded) {
-		select {
-		case <-doneInimigo:
-			return
-		default:
+		// select {
+		// case <-doneInimigo:
+		// 	return
+		// default:
 			curX, curY := i.x, i.y
 			speedX := rand.Intn(3) - 1 // Generate a random speed for X direction (-1, 0, 1)
 			speedY := rand.Intn(3) - 1 // Generate a random speed for Y direction (-1, 0, 1)
@@ -430,15 +440,17 @@ func logicaInimigoLui() {
 			desenhaTudo()
 			mutex.Unlock()
 			if borked {
-				time.Sleep(800 * time.Millisecond) // Pause for a short duration
+				mutex.Lock()
 				statusMsg = "O Inimigo levou stun!"
+				mutex.Unlock()
+				time.Sleep(800 * time.Millisecond) // Pause for a short duration
 			} else {
 				time.Sleep(100 * time.Millisecond) // Pause for a short duration
 			}
 
 		}
 	}
-}
+//}
 
 func logicNPC() {
 
@@ -493,10 +505,10 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 		for y := max(0, i.y-2); y <= min(len(mapa)-1, i.y+2); y++ {
 			for x := max(0, i.x-2); x <= min(len(mapa[y])-1, i.x+2); x++ {
 				if mapa[y][x].simbolo == chave.simbolo {
-					statusMsg = "O inimigo matou a chave, corra para a porta!"
 					winnable = true
-
+					
 					mutex.Lock()
+					statusMsg = "O inimigo matou a chave, corra para a porta!"
 					mapa[y][x] = vazio
 					desenhaTudo()
 					borked = true
@@ -504,8 +516,8 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 
 				} else if mapa[y][x].simbolo == npc.simbolo {
 					if n.canBeKilled {
-						statusMsg = "O inimigo matou o NPC!"
 						mutex.Lock()
+						statusMsg = "O inimigo matou o NPC!"
 
 						n.elem = vazio
 						mapa[y][x] = vazio
@@ -516,12 +528,16 @@ func checkEnemy2cell() /* pode matar chave e npc*/ {
 						doneNPC <- true
 
 					} else {
+						mutex.Lock()
 						statusMsg = "O inimigo não pode matar o NPC!"
+						mutex.Unlock()
 					}
 				}
 				if borked {
 					time.Sleep(500 * time.Millisecond) // Pause for a short duration
+					mutex.Lock()
 					borked = false
+					mutex.Unlock()
 				}
 			}
 		}
@@ -534,8 +550,8 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 		for y := max(0, i.y-1); y <= min(len(mapa)-1, i.y+1); y++ {
 			for x := max(0, i.x-1); x <= min(len(mapa[y])-1, i.x+1); x++ {
 				if mapa[y][x].simbolo == parede.simbolo {
-					statusMsg = "O inimigo quebrou uma parede!"
 					mutex.Lock()
+					statusMsg = "O inimigo quebrou uma parede!"
 					mapa[y][x] = vazio
 					desenhaTudo()
 					borked = true
@@ -543,15 +559,17 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 
 				} else if mapa[y][x].simbolo == personagem.simbolo {
 					if personagem.canBeKilled {
-						statusMsg = "O inimigo te matou!"
 						mutex.Lock()
+						statusMsg = "O inimigo te matou!"
 						n.elem = vazio
 						mapa[y][x] = vazio
 						desenhaTudo()
 						mutex.Unlock()
 						ded = true
 					} else {
+						mutex.Lock()
 						statusMsg = "O inimigo não pode te matar!"
+						mutex.Unlock()
 					}
 				}
 				if borked {
@@ -568,19 +586,19 @@ func checkEnemy1cell() /* pode matar parede e jogador*/ {
 func logicaPortal() {
 	for !(ganhei || ded) {
 		time.Sleep(time.Duration(rand.Intn(7)) * time.Second)
-		var yPortal int = posY + rand.Intn(3) - 1
-		var xPortal int = posX + rand.Intn(3) - 1
-		if yPortal == posY && xPortal == posX {
-			yPortal++
-			xPortal++
+		p.y = posY + rand.Intn(3) - 1
+		p.x = posX + rand.Intn(3) - 1
+		if p.y == posY && p.x == posX {
+			p.y++
+			p.x++
 		}
 		mutex.Lock()
-		mapa[yPortal][xPortal].simbolo = portal.simbolo
+		mapa[p.y][p.x] = portal
 		desenhaTudo()
 		mutex.Unlock()
 		time.Sleep(5 * time.Second)
 		mutex.Lock()
-		mapa[yPortal][xPortal].simbolo = vazio.simbolo
+		mapa[p.y][p.x] = vazio
 		desenhaTudo()
 		mutex.Unlock()
 		time.Sleep(5 * time.Second)
